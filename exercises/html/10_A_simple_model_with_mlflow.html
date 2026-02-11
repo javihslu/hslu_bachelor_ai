@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>10_Ein_einfaches_Modell_mit_MLFlow</title>
+
+    <link rel="stylesheet" href="css/bulma.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/default.min.css">
+    <script src="css/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>
+        // prevent annoying text selection when clicking to open solutions, but allow normal mouse selection
+        document.addEventListener('mousedown', function (event) {
+            if (event.detail > 1) {
+                event.preventDefault();
+            }
+        }, false);
+    </script>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-10 content-column">
+
+
+                    <h1 class="title is-1">Experiment Tracking und Model Registry</h1>
+
+                    <div class="block">
+                        In this exercise we extend the code that trains our simple model with
+                        <em>Experiment Tracking</em>. We conduct several experiments and compare their
+                        results in MLFlow. We add metadata to our models, register a model in the
+                        Registry and briefly try out the MLFlow Client (the low-level API of MLFlow).
+                    </div>
+
+                    <h1 class="title is-1">Preparation</h1>
+
+                    <h3 class="title is-3"> Create notebook for the code</h3>
+
+                    <div class="block">
+                        First, copy your previous notebook (<em>01-Simple_Model.ipynb</em>) with the code
+                        that trains the simple ML model and give the copy the name
+                        <em>02-Simple_Model_MLFlow.ipynb</em> and close the no longer needed notebook
+                        <em>01-Simple_Model.ipynb</em>.
+                    </div>
+
+                    <h1 class="title is-1">Exercises</h1>
+
+                    <h3 class="title is-3"> MLFlow Setup</h3>
+
+                    <div class="block">
+                        Import mlflow at a suitable location in your <em>02-Simple_Model_MLFlow.ipynb</em>:
+                    </div>
+
+                    <div class="block">
+                        <pre><code>import mlflow</code></pre>
+                    </div>
+
+                    <div class="block">
+                        You don't need to set the tracking URL. Do you remember why this is not necessary?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                The URL is set as an environment variable in the docker-compose of the Development
+                                Environment:
+                                <div class="block">
+                                    <pre><code>environment:
+  - MLFLOW_TRACKING_URI=http://model-registry:5001</code></pre>
+                                </div>
+
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now execute the cells from loading the data up to and including the definition of the
+                        classifier.
+                    </div>
+
+                    <div class="block">
+                        Next you must name your MLFlow experiment. The experiment bundles all attempts with
+                        the Mushroom
+                        Dataset.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                After your cell that defines your classifier, add a cell that sets the MLFLow
+                                experiment.
+                                <pre><code>mlflow.set_experiment("Mushroom Categorization")</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        If a file:// URI appears in the cell output similar to this
+                        <pre><code>artifact_location='file:///notebooks/mlruns/690674629580441585'</code></pre>
+                        it would indicate that the <em>MLFLOW_TRACKING_URI</em> is not set correctly. Go
+                        back to the previous exercise and look at the third-to-last <em>Suggested solution</em> again.
+                        Correct would be something like:
+                        <pre><code>artifact_location='mlflow-artifacts:/1'</code></pre>
+                        If the execution of this cell takes more than a few seconds, that is an indication that the URI
+                        is set but is incorrect, or that the MLFlow service is not running.
+                    </div>
+
+                    <h3 class="title is-3"> Define hyper-parameters</h3>
+
+                    <div class="block">
+                        Now you restructure the existing code so that the hyper-parameters of the classifier are stored
+                        in a
+                        dictionary.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code># when adhering to the suggested solutions, this could look like the following:
+
+params = {
+    'n_estimators': 10
+}
+clf.set_params(**params)</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Training and evaluation</h3>
+
+                    <div class="block">
+                        Now it's time to evaluate the model. To do this, we need to determine which metrics we
+                        use (actually, this is a very central step that must be performed at the very beginning of an ML
+                        project, because the metrics with which we evaluate the model
+                        must be as well aligned with the business goal).
+                    </div>
+
+                    <div class="block">
+                        We can log the classic accuracy, precision, recall and F1-score here. Import
+                        these metrics from <em>sklearn.metrics</em>
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        We validate with a simple, fixed validation set. Use
+                        <em>train_test_split()</em> once more on the training set to split off a fixed
+                        validation set from it.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>X_train_small, X_val, y_train_small, y_val = train_test_split(X_train, y_train, random_state=42)</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        With this we can now train with the <em>_small</em> variants (X_train_small, y_train_small)
+                        and validate with <em>_val</em>. Up to and including this step there is no MLFlow-specific
+                        code.
+                    </div>
+
+                    <div class="block">
+                        Use <em>fit()</em> to train and <em>y_pred = predict()</em> to make predictions
+                        for the subsequent validation.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>clf.fit(X_train_small, y_train_small)
+y_pred = clf.predict(X_val)</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now we fill a dictionary with our four metrics.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>metrics_static_val_set = {
+        "accuracy": accuracy_score(y_val, y_pred),
+        "precision": precision_score(y_val, y_pred),
+        "recall": recall_score(y_val, y_pred),
+        "f1": f1_score(y_val, y_pred),
+}</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        And create an MLFlow signature for the training data.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>from mlflow.models import infer_signature
+signature = infer_signature(model_input=X_train, model_output=y_train)
+</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        And now that we have <em>signature</em>, <em>parameters</em>, <em>model</em> and
+                        <em>scores</em>,
+                        we can start the MLFlow run and log all four things.
+                    </div>
+
+                    <div class="block">
+                        As a reminder: To avoid logging a
+                        half-finished run when an exception occurs during training, we only start the MLFlow run for
+                        logging when we have all
+                        components for logging together, i.e. only after training and evaluation.
+                    </div>
+
+                    <div class="block">
+                        Give the run a name. Which name you give the run depends on what you are currently
+                        experimenting with, which hyperparameters you want to test, etc.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>with mlflow.start_run(run_name="baseline model") as run:
+    mlflow.log_params(params)
+    mlflow.log_metrics(metrics_static_val_set)
+    mlflow.sklearn.log_model(
+            sk_model=clf, signature=signature, name="mushroom"
+    )
+
+    # This call should execute quickly
+    # If it takes more than a few seconds, the problem is most
+    # likely that the top-level artifact bucket has not been created.
+    # You would see this also in the docker log output of the mlflow service
+    # If you have this problem, go back to the end of the previous exercise
+    # where you create the bucket.
+</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        If everything worked, we see in the MLFlow UI (you cannot use the URLs output in the notebook,
+                        you must open the Model Registry via codespaces under PORTS) that metadata, the four metrics,
+                        the parameter(s) and the model were logged. When we click on a metric, it is displayed as a
+                        plot. The Y-axis corresponds
+                        here to the value of the metric, the X-axis to so-called <em>steps</em>. Steps can be used
+                        to map training over time, i.e. a learning curve over epochs, over
+                        training set sizes or other hyperparameters. If we don't specify the
+                        <em>step=</em> argument in <em>log_metrics()</em>, by default only one step is logged, which
+                        then leads to the
+                        constant plot as we see it here.
+                    </div>
+
+                    <h3 class="title is-3"> Compare runs</h3>
+
+                    <div class="block">
+                        Now change a parameter of your model and log a second run.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code># only the second line and the run_name were changed
+
+params = {
+    'n_estimators': 20
+}
+clf.set_params(**params)
+
+clf.fit(X_train_small, y_train_small)
+y_pred = clf.predict(X_val)
+
+metrics_static_val_set = {
+    "accuracy": accuracy_score(y_val, y_pred),
+    "precision": precision_score(y_val, y_pred),
+    "recall": recall_score(y_val, y_pred),
+    "f1": f1_score(y_val, y_pred), 
+}
+
+with mlflow.start_run(run_name="another_run") as run:
+    mlflow.log_params(params)
+    mlflow.log_metrics(metrics_static_val_set)
+    mlflow.sklearn.log_model(
+            sk_model=clf, signature=signature, name="mushroom"
+    )</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        You can now select both runs in the MLFlow UI and then compare them. You can display various
+                        plots and show the differences in parameters and metrics. By increasing the
+                        estimators, the accuracy should now be slightly higher.
+                    </div>
+
+                    <h3 class="title is-3"> K-Fold Cross Validation</h3>
+
+                    <div class="block">
+                        Evaluation on a fixed validation set is only recommended when we have a lot of data, and
+                        our validation set is large enough and thus representative of the entire training set.
+                        Smaller datasets and fast-training models allow for K-fold cross validation and
+                        thereby more precise statements about our model performance. How would we log results of a
+                        K-fold
+                        cross validation in MLFlow?
+                    </div>
+
+                    <div class="block">
+                        Unfortunately, MLFlow does not support this directly. As a workaround, we could log the average
+                        over
+                        our folds.
+                    </div>
+
+                    <h3 class="title is-3"> Autolog</h3>
+
+                    <div class="block">
+                        Now we simplify the logging somewhat by using the <em>autolog</em> function of MLFlow. Here it
+                        is important that the autologging functionality is activated
+                        <em>before</em> the used metric is imported from sklearn.
+                    </div>
+
+                    <div class="block">
+                        <strong>Therefore restart the Jupyter kernel (in the menu Kernel -> Restart).</strong>
+                    </div>
+
+                    <div class="block">
+                        Execute all necessary cells up to the import of MLFlow.
+                    </div>
+
+                    <div class="block">
+                        Activate the autolog function right below the cell where you set the experiment, and thus
+                        <em>before</em> you import the metrics from sklearn.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>mlflow.set_experiment("Mushroom Categorization")
+mlflow.autolog()</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Execute the remaining cells up to and including the <em>fit()</em> of your model.
+                    </div>
+
+                    <div class="block">
+                        A new run is automatically logged, which you can view in the MLFlow UI. This
+                        functionality is very practical, as many additional metadata are logged with it.
+                    </div>
+
+                    <div class="block">
+                        But... so far only the training metrics have been logged, which of course does not help us a lot
+                        when judging our model performance. To also log the validation metrics, the scorers must be
+                        executed, this is then captured by autolog:
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>y_pred = clf.predict(X_val)
+
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+metrics_static_val_set = {
+    "accuracy": accuracy_score(y_val, y_pred),
+    "precision": precision_score(y_val, y_pred),
+    "recall": recall_score(y_val, y_pred),
+    "f1": f1_score(y_val, y_pred),
+}    </code>
+</pre>
+                    </div>
+
+                    <h3 class="title is-3"> Metadata</h3>
+
+                    <div class="block">
+                        Runs can be provided with a <em>description</em> and with <em>tags</em>. This can
+                        either happen during logging of the run, or afterwards in the UI or via the
+                        API (described further below).
+                    </div>
+
+                    <div class="block">
+                        Add a description and a new tag to a run using the UI.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                This can be done in the Overview tab of a run.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        You can also add metadata to the model itself. These then appear in the <em>MLmodel</em>
+                        file.
+                    </div>
+
+                    <div class="block">
+                        Log a new run and add model metadata. Find this metadata in the UI.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code># you need to add a metadata parameter with a dictionary when calling log_model()
+# you can then see the metadata in the MLmodel File
+with mlflow.start_run() as run:
+    mlflow.sklearn.log_model(
+        sk_model=clf, signature=signature, name="mushroom", metadata={'foobar':'baz'}
+    )</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Register models</h3>
+
+                    <div class="block">
+                        So far we have only been in the development phase. Once we have reached the point
+                        where we have a model that we want to deploy, we must
+                        <em>register</em> it.
+                    </div>
+
+                    <div class="block">
+                        We can do this either in the MLFlow UI by clicking on
+                        the desired model in the run overview in the <em>Models</em> column,
+                        then a <em>Register model</em> button appears in the top right.
+                        Or we can do it directly from the <em>log_model()</em> call, using the
+                        parameter <em>registered_model_name="some model name"</em>. Or we do it with the function <a
+                            href="https://mlflow.org/docs/latest/python_api/mlflow.html#mlflow.register_model">mlflow.register_model()</a>
+                        or via API (see below).
+                    </div>
+
+                    <div class="block">
+                        If we choose a model name that does not yet exist, a new model in
+                        version 1.0 is registered. If we choose a name that already exists, the model
+                        is registered under this name and the version is incremented by one. Try this out once.
+                    </div>
+
+                    <div class="block">
+                        Registered models appear under the <em>Models</em> tab. A model has a name, a
+                        version and tags. Versions can have an alias, which are explained further below.
+                    </div>
+
+                    <h3 class="title is-3"> MLFlow Client API</h3>
+
+                    <div class="block">
+                        So far we have worked with the higher-level <em>mlflow</em> module. But there is also
+                        a second API that allows low-level access to MLFlow, the <a
+                            href="https://mlflow.org/docs/latest/python_api/mlflow.client.html">MLFlow Client</a>,
+                        which provides a simple CRUD interface for experiments, runs and models.
+                    </div>
+
+                    <div class="block">
+                        Use the MLFlow Client to list all registered models.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>from mlflow import MlflowClient
+
+client = MlflowClient()
+client.search_registered_models()</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Retrieve a model using <em>get_model_version()</em> and output its description, alias and
+                        version.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>model = client.get_model_version(name='name of one of your models', version="1")
+model.description, model.aliases, model.version</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Add a description to your model using <em>update_model_version()</em>. The
+                        description is attached to the version. There is also a description that is attached to the
+                        model. Check in the UI afterwards whether this worked.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>client.update_model_version(name='name of one of your models', version="1", description="foobar")</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Model version aliases</h3>
+
+                    <div class="block">
+                        Models can be loaded either via path, via name+version or via alias, see
+                        the <a
+                            href="https://mlflow.org/docs/latest/getting-started/registering-first-model/step3-load-model.html?">documentation</a>.
+                    </div>
+
+                    <div class="block">
+                        Model version aliases are identifiers that are attached to a version. They are used to
+                        decouple the calling code from the model version. We can give our
+                        active, deployed model the alias <em>champion</em> (as in "our currently best-perorming model")
+                        and reference it via this. If we develop a new, improved model, we can assign the alias
+                        <em>champion</em>
+                        to this new model and don't need to adjust the calling code.
+
+                    </div>
+
+                    <div class="block">
+                        Register your best model, if not already done, then give it the alias
+                        <em>champion</em> using the function <em>set_registered_model_alias()</em>. You will
+                        use this model later.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>client.set_registered_model_alias(name='name of one of your models', version="1", alias='champion')</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <!-- and it's easy to individually load additional languages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/go.min.js"></script>
+    <script src="js/copy-button.js"></script>
+</body>
+
+</html>

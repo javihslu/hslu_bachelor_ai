@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>06_Einfuehrung_Infrastruktur</title>
+
+    <link rel="stylesheet" href="css/bulma.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/default.min.css">
+    <script src="css/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>
+        // prevent annoying text selection when clicking to open solutions, but allow normal mouse selection
+        document.addEventListener('mousedown', function (event) {
+            if (event.detail > 1) {
+                event.preventDefault();
+            }
+        }, false);
+    </script>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-10 content-column">
+
+
+                    <h1 class="title is-1">Exercise Structure</h1>
+
+                    <div class="block">
+                        The exercises are provided as HTML files.
+                    </div>
+
+                    <div class="block">
+                        Some exercises come as simple questions. For most exercises, however,
+                        a Docker container must be configured or code must be written. The answer can
+                        be compared directly with the suggested solution.
+                    </div>
+
+                    <h1 class="title is-1">Exercise 1: Base Infrastructure</h1>
+
+                    <div class="block">
+                        At the beginning of the workshop, the infrastructure looks as shown in the following diagram.
+                    </div>
+
+                    <img src="img/overview.png" width="50%">
+
+                    <h3 class="title is-3">Service Definition</h3>
+
+                    <div class="block">
+                        We therefore start with two separate Docker networks and two containers:
+                    </div>
+
+                    <div class="block">
+                        <ul>
+                            <li>The object store</li>
+                            <li>The development environment in the form of a JupyterLab server</li>
+                        </ul>
+                    </div>
+
+                    <div class="block">
+                        Under the paths
+                    </div>
+
+                    <div class="block">
+                        <ul>
+                            <li><em>exercises/</em></li>
+                            <li><em>exercises/containers/development_env/</em></li>
+                            <li><em>exercises/containers/objectstore/</em></li>
+                        </ul>
+                    </div>
+
+                    <div class="block">
+                        you will find the <em>Dockerfiles</em> and <em>docker-compose.yml</em> files of the development
+                        environment and
+                        the object store. Check them out to get the first idea of how the exercise infrastructure is set
+                        up. You can ignore the other Dockerfiles and compose
+                        files for now. How is the hierarchy of the Docker files structured?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                In the top-level compose file <em>docker-compose.yml</em> the two
+                                networks are defined via include. After that, the compose files of the individual
+                                services are listed.
+                                The services are then defined in the subfolder <em>containers/</em>. Each service has
+                                its own folder. Some services only need a <em>docker-compose.yml</em>,
+                                others additionally need a <em>Dockerfile</em>.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="notification is-info is-light">
+                        <b>Attention: </b>Some services are still commented out. They are not needed yet, we
+                        will activate them step by step later.
+                    </div>
+
+                    <div class="block">
+                        Now start all containers. This takes a moment the first time, as the images must be loaded.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                To do this, execute the following command in the directory <em>exercises/</em>, where
+                                the top-level compose file <em>docker-compose.yml</em> is located
+                                <div class="block">
+                                    <em>docker compose up</em>
+                                </div>
+                                The process remains in the foreground and you can leave the terminal window open.
+                                Later you can simply stop the process with <em>ctrl-c</em>.
+
+                                You can also execute <em>docker compose up -d</em> to send the process to the
+                                background.
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Docker Networks</h3>
+
+                    <div class="block">
+                        We simulate a separation of development environment and production environment by defining two
+                        Docker networks and assigning each container to either one or the other of the two
+                        networks. Only services that run productively and must also be reachable from the development
+                        environment
+                        are assigned to both networks.
+                    </div>
+
+                    <div class="block">
+                        Name some such services that should typically be assigned to both the development and
+                        production network.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Some possible services that must be accessible from both networks are
+                                <ul>
+                                    <li>Object Store</li>
+                                    <li>Git</li>
+                                    <li>Docker Registry</li>
+                                    <li>Model Registry</li>
+                                </ul>
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Object Store</h3>
+
+                    <div class="block">
+                        We use an object store for data storage. An object store stores data as
+                        independent objects that consist of three components: a unique ID, metadata and
+                        the actual data (e.g. files, images or videos). Unlike traditional
+                        file systems, objects are not hierarchically organized. Access usually occurs via APIs,
+                        which facilitates integration into distributed systems.
+                    </div>
+
+                    <div class="block">
+                        A block store, on the other hand, stores data in blocks of fixed size that are stored in a
+                        structured
+                        arrangement on storage media such as hard drives or SSDs. This structure
+                        enables fast read and write operations, making block storage particularly suitable for
+                        applications such as
+                        databases or operating systems that require direct and high-performance data access.
+                        The main difference lies in the application: Object stores are optimized for storing
+                        and managing data in large, scalable systems, while block storage
+                        is designed for high performance.
+                    </div>
+
+                    <div class="block">
+                        For data storage we use a local object store that offers an S3-compatible API.
+                        As a solution we use <a href="https://min.io/">MinIO</a>, an open-source product that
+                        allows us
+                        to set up a locally running
+                        object store with minimal configuration. With MinIO we store training data,
+                        artifacts from the training process, features and predictions.
+                    </div>
+
+                    <div class="block">
+                        Look at the Docker compose file of the object store. Which local directory is used for
+                        storing the object store data?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                In the docker-compose file of minio (<em>containers/objectstore/docker-compose.yml</em>)
+                                you can find the volume
+                                mount:
+
+                                <div class="block">
+                                    <pre>
+                                        <code>volumes:
+ - ../../s3_data:/data</code>
+                                        </pre>
+                                </div>
+
+                                From this you can see that the data is stored outside the container in the local
+                                directory
+                                <em>s3_data</em> (below the folder <em>exercises/</em>). Inside
+                                the container the data is located in the directory
+                                <em>/data</em>. In the command directive you can see that the minio daemon is given the
+                                directory <em>/data</em> as an argument at startup:
+
+                                <div class="block">
+                                    <pre>
+                                            <code>command: server --address "0.0.0.0:9000" /data</code>
+                                        </pre>
+                                </div>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="notification is-info is-light">
+                        <b>Attention: </b>Do not directly access the data inside the s3_data/ folder. This data is
+                        internal to MinIO and can only be accessed through APIs.
+                    </div>
+
+                    <h1 class="title is-1">Development Environment</h1>
+
+                    <div class="block">
+                        We simulate the development environment in which data scientists perform analyses and
+                        develop models with a single container that provides a Jupyter environment.
+                        This is completely sufficient in the context of the exercises. In reality, a
+                        development environment would of course be somewhat more complex, at least an IDE and GPUs would
+                        also need to be available in addition to a
+                        Jupyter environment.
+                    </div>
+
+                    <div class="block">
+                        Look at the docker-compose file of the development environment to find the URL and port
+                        via which you access Jupyterlab.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                In the file <em>development_env/docker-compose.yml</em> you find the section
+
+                                <div class="block">
+                                    <pre>
+                                            <code>ports:
+ - 127.0.0.1:8080:8888</code>
+                                            </pre>
+                                </div>
+
+                                The port on which Jupyterlab runs in the container is 8888. It is mapped to port
+                                8080 outside the container. So you can access the development environment with the
+                                browser via port 8080.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Access the development environment via browser. If you are working locally, you can access it
+                        via
+                        127.0.0.1:8080. If you are working with Github Codespaces, this port
+                        will be automatically forwarded from the cloud, you can see all
+                        forwarded ports via the PORTS tab (next to the TERMINAL tab) in
+                        Codespaces. At the moment, only the port of the development environment (dev-env) is listed,
+                        more services will be added later.
+                        By right-clicking on dev-env you can open it in the browser.
+                        You can log in directly without having to specify a token
+                        or other credentials. This was configured this way for the exercises for convenience.
+                        In a real installation, authorization and
+                        authentication should of course be activated.
+                    </div>
+
+                    <div class="block">
+                        Try to find out how or where authorization for Jupyter was deactivated.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                You can find the configuration directly in the Dockerfile:
+
+                                <pre>
+                                            <code># generate a config directory and the default config
+RUN jupyter notebook --generate-config
+# configure jupyter for easy access (don't do this in production!!!)
+RUN echo "c.NotebookApp.open_browser = False" >>
+/root/.jupyter/jupyter_notebook_config.py && \
+echo "c.JupyterApp.answer_yes = True" >> /root/.jupyter/jupyter_notebook_config.py
+&& \
+echo "c.NotebookApp.ip = '*'" >> /root/.jupyter/jupyter_notebook_config.py && \
+echo "c.NotebookApp.allow_origin = '*'" >> /root/.jupyter/jupyter_notebook_config.py
+&& \
+echo "c.NotebookApp.token = ''" >> /root/.jupyter/jupyter_notebook_config.py && \
+echo "c.NotebookApp.password = ''" >> /root/.jupyter/jupyter_notebook_config.py</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now access the development environment with your browser. You should see something like the
+                        following:
+                    </div>
+
+                    <img src="img/jupyter.png">
+
+                    <div class="block">
+                        You can also open Jupyterlab if you prefer it to the standard Jupyter environment:
+                    </div>
+
+                    <img src="img/jupyter_open_lab.png">
+
+                    <img src="img/jupyterlab.png">
+
+                    <div class="block">
+                        Now use the development environment to create a new Jupyter notebook. Name it
+                        `hello_world.ipynb` and have it output a Hello World.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                You can do this even without a suggested solution ;-)
+                            </article>
+                        </details>
+                    </div>
+
+                    <h1 class="title is-1">Reading and Writing from the Object Store</h1>
+
+                    <div class="block">
+                        We use <em>s3fs</em> to write files to the object store and read from it. You
+                        can find the documentation <a href="https://s3fs.readthedocs.io/en/latest/">here</a>.
+                    </div>
+
+                    <div class="block">
+                        Now open a new notebook in the development environment (or recycle the previous
+                        helloworld notebook) to get a little practice working with the object store:
+                    </div>
+
+                    <div class="block">
+                        <ul>
+                            <li>Create a bucket</li>
+                            <li>Write a text file to this bucket</li>
+                            <li>Display the contents of the bucket</li>
+                            <li>Try out some other commands from the <a
+                                    href="https://s3fs.readthedocs.io/en/latest/api.html">API</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Here is a code example.
+
+                                <pre><code>import s3fs
+
+# create a reference to the object store
+s3 = s3fs.S3FileSystem()
+
+# create a bucket
+s3.mkdir("mybucket")
+
+# write a file. According to the documentation, only binary mode works, although writing a string directly seems to work as well
+with s3.open('mybucket/hello.txt', 'wb') as f:
+    f.write(r'Hello World'.encode('utf-8'))
+
+# some more commands
+s3.ls('mybucket')
+s3.du('mybucket/hello.txt')</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Your objects created this way are persisted in the s3_data/ directory and thus also survive
+                        a restart of the container.
+                    </div>
+
+                    <div class="block">
+                        Can you explain how authorization and the connection to the object store works? How
+                        are URL and credentials passed?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                In the docker-compose file of the development environment you see that the following
+                                environment variables are set:
+
+                                <pre>
+                                                    <code>environment:
+ - FSSPEC_S3_KEY=${MINIO_ADMIN}
+ - FSSPEC_S3_SECRET=${MINIO_SECRET}
+ - FSSPEC_S3_ENDPOINT_URL=${MINIO_ENDPOINT}</code></pre>
+
+                                If you search the s3fs documentation for the first of these three variables, <a
+                                    href="https://s3fs.readthedocs.io/en/latest/index.html?highlight=FSSPEC_S3_KEY#s3-compatible-storage">you
+                                    find</a> that these variables, if present, are used when creating the s3 object with
+                                <em>s3fs.S3FileSystem()</em> to set the credentials and the endpoint.
+                                That's why you didn't have to explicitly specify this info in the above exercise.
+
+                                If you now look at the docker-compose file of the object store, you see that the
+                                server is told at startup to listen on port 9000 and the username and password
+                                of the root user are communicated via environment variables. We use this user for
+                                everything here for
+                                simplicity, which of course is not done in practice.
+
+                                <pre>
+                                                        <code>command: server --address "0.0.0.0:9000" /data
+hostname: objectstore
+expose:
+ - "9000"
+environment:
+ - MINIO_ROOT_USER=${MINIO_ADMIN}
+ - MINIO_ROOT_PASSWORD=${MINIO_SECRET}</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        And where are username, secret and endpoint actually set?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                The actual values for password and endpoint are set in a .env file:
+
+                                <pre>
+                                                            <code>$ cat .env
+MINIO_ADMIN=xxx
+MINIO_SECRET=xxx
+MINIO_ENDPOINT=http://objectstore:9000</code>
+                                                            </pre>
+
+                                Docker-compose <a
+                                    href="https://docs.docker.com/compose/environment-variables/set-environment-variables/#use-the-env_file-attribute">uses
+                                    this .env file</a> to fill in the placeholders accordingly.
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Summary</h3>
+
+                    <div class="block">
+                        So we start with the following infrastructure:
+                    </div>
+
+                    <img src="img/summary.png" width="50%">
+
+                    <div class="block">
+                        The implementation of the exercises takes place in containers that are assigned to the Docker
+                        networks
+                        <em>Development</em> or <em>Production</em>.
+                    </div>
+
+                    <div class="block">
+                        So far we have the object store, which can be used from both networks, and the
+                        development environment, which only has access to the development network.
+                    </div>
+
+                    <div class="block">
+                        More services will be added during the workshop.
+                    </div>
+
+                    You can now continue with the next exercise: <a href="07_A_simple_model.html">07_A_simple_model</a>
+
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <!-- and it's easy to individually load additional languages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/go.min.js"></script>
+    <script src="js/copy-button.js"></script>
+</body>
+
+</html>

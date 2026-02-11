@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>14_Stream_Processing_Infrastruktur</title>
+
+    <link rel="stylesheet" href="css/bulma.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/default.min.css">
+    <script src="css/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>
+        // prevent annoying text selection when clicking to open solutions, but allow normal mouse selection
+        document.addEventListener('mousedown', function (event) {
+            if (event.detail > 1) {
+                event.preventDefault();
+            }
+        }, false);
+    </script>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-10 content-column">
+
+
+                    <h1 class="title is-1">Stream Processing Infrastructure</h1>
+
+                    <div class="block">
+                        In this exercise we set up the event streaming service and get to know it. We
+                        use <a href="https://www.redpanda.com/">Redpanda</a> as event streaming plattform. Redpanda
+                        describes their product as follows:
+                    </div>
+
+                    <div class="block">
+                        <em>Redpanda is the most complete, Apache Kafka®-compatible streaming data platform, designed
+                            from the ground up to be lighter, faster, and simpler to operate. Free from ZooKeeper™ and
+                            JVMs, it prioritizes an end-to-end developer experience with a huge ecosystem of connectors,
+                            configurable tiered storage, and more.</em>
+                    </div>
+
+                    <div class="block">
+                        For the exercise infrastructure, the simpler, lighter installation
+                        compared to the standard <a href="https://kafka.apache.org/">Apache Kafka</a> from <a
+                            href="https://docs.confluent.io/kafka/overview.html">Confluent</a> is especially important.
+                    </div>
+
+                    <h1 class="title is-1">Preparation</h1>
+
+                    <div class="block">
+                        Save all your open notebooks. Stop all containers by going to the top-level
+                        directory of the exercises (where the <em>docker-compose.yml</em> file is located) and
+                        executing <em>docker compose down</em>. If you are running the containers in the foreground, you
+                        can
+                        stop the processes in this terminal with <em>ctrl-c</em>.
+                    </div>
+
+                    <div class="block">
+                        Uncomment the event streaming service in the top-level compose file <em>docker-compose.yml</em>.
+                    </div>
+
+                    <div class="block">
+                        Restart all containers.
+                    </div>
+
+                    <h1 class="title is-1">Exercises</h1>
+
+                    <h3 class="title is-3"> Redpanda Service</h3>
+
+                    <div class="block">
+                        We extend our infrastructure with an event streaming plattform to enable an <a
+                            href="https://en.wikipedia.org/wiki/Event-driven_architecture">event-driven
+                            architecture</a>.
+                    </div>
+
+                    <div class="block">
+                        In the first exercise we defined the two Docker networks <em>development</em> and
+                        <em>production</em>. Into which of these networks do we bind the event streaming service?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Production and development should be strictly separated here in a suitable
+                                way,
+                                either through two separate instances or through other measures. For
+                                the course, however, we limit the complexity by using the same event streaming service
+                                in both Docker networks <em>development</em> and <em>production</em>, even
+                                though this solution is not ideal.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Look at the compose file of the event streaming service. Since this infrastructure service was
+                        designed to run highly available and horizontally scalable under Kubernetes, the compose file is
+                        somewhat more complex.
+                    </div>
+
+                    <div class="block">
+                        <ol>
+                            <li>Via which port can you access the event streaming service from outside Docker?</li>
+                            <li>Which two APIs are defined in the file?</li>
+                            <li>Via which URI do we use the service when we access it via Kafka (and not via HTTP)?</li>
+                        </ol>
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <ol>
+                                    <li>From outside Docker you can only access via the Redpanda Console, via
+                                        port 8085: Try this once (event-streaming service in codespaces).</li>
+                                    <li>On the one hand the Kafka API, on the other hand the Pandaproxy (an HTTP REST
+                                        API)</li>
+                                    <li>You can find the answer in the <em>command</em> directive, somewhat hidden:
+
+                                        <em>--advertise-kafka-addr internal://event-streaming:9092</em>
+                                    </li>
+                                </ol>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Our environment now looks like this (but in an actual production environment, the event
+                        streaming service would be split into development and production by suitable means).
+                        The already created batch inference pipeline is not shown in the diagram below.
+                    </div>
+
+                    <img src="img/summary_event_streaming.png" width="50%">
+
+                    <h3 class="title is-3"> Create topic with the console</h3>
+
+                    <div class="block">
+                        We now need a topic to send messages to.
+                    </div>
+
+                    <div class="block">
+                        Use the Redpanda Console (event-streaming service in codespaces), <strong>to create a topic with
+                            the name <em>dev_sandbox</em></strong>. Otherwise leave everything at the defaults.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Use the Redpanda Console.
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Command line tool rpk</h3>
+
+                    <div class="block">
+                        In every Redpanda container the Redpanda CLI tool <em>rpk</em> is installed. Here
+                        you can find the <a href="https://docs.redpanda.com/current/reference/rpk/">command
+                            reference</a>
+                        of <em>rpk</em>.
+                    </div>
+
+                    <div class="block">
+                        Use <em>rpk</em> directly in the running event streaming container to display
+                        <em>information</em>
+                        about the running <em>cluster</em>.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                You execute the command interactively (-it) in the event-streaming container using
+                                docker exec
+                                rpk cluster info:
+                                <pre><code>docker exec -it event-streaming rpk cluster info</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now send <strong>at least two messages</strong> to the previously created topic (hint:
+                        use <em>rpk topic produce</em>).
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <ol>
+                                    <li><em>docker exec -it event-streaming rpk topic produce dev_sandbox</em></li>
+                                    <li>Type message and finish with enter</li>
+                                    <li>Cancel with ctrl-c.</li>
+                                </ol>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Check in the Redpanda Console if you can see the messages.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Under Topic click on the <em>dev_sandbox</em> topic.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now consume a single message.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>docker exec -it event-streaming rpk topic consume dev_sandbox --num 1</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        If you consume another message in the same way, you get the first
+                        message again. Kafka/Redpanda does not track who consumes which messages, and messages
+                        cannot be selectively deleted. This implementation as an append-only log is one of the
+                        reasons why the architecture scales so well horizontally.
+                    </div>
+
+                    <div class="block">
+                        Messages have a <a
+                            href="https://docs.redpanda.com/current/develop/consume-data/consumer-offsets/">consumer
+                            offset</a>, which is used to read messages from a specific point. It
+                        is the consumer's responsibility to track this offset or tell Kafka up to
+                        which offset was read.
+                    </div>
+
+                    <div class="block">
+                        High-level APIs do this automatically, when we use a low-level API like rpk, we must
+                        do this ourselves.
+                    </div>
+
+                    <div class="block">
+                        Look in the Redpanda Console for the offset of the second message and read exactly
+                        this one. The ways to specify offsets are <a
+                            href="https://docs.redpanda.com/current/reference/rpk/rpk-topic/rpk-topic-consume/#offsets">described
+                            here</a>.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Du gibst den zu lesenden Offset mit --offset an:
+                                <pre><code>docker exec -it event-streaming rpk topic consume dev_sandbox --offset 1:2</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Consumer groups</h3>
+
+                    <div class="block">
+                        One concept we still need to know roughly is that of <em>consumer groups</em>.
+                        Through these, consumers can organize themselves into groups. Why consumer groups are necessary
+                        can be read <a
+                            href="https://www.redpanda.com/guides/kafka-architecture-kafka-consumer-group">here</a>.
+                    </div>
+
+                    <div class="block">
+                        Important for us is that a message can be read by exactly one consumer per consumer group. If we
+                        read a message as part of a consumer group, we can (automatically) commit the offset
+                        of the message, so that this message is not read a second time afterwards.
+                    </div>
+
+                    <h3 class="title is-3"> Consuming with kafka-python</h3>
+
+                    <div class="block">
+                        Now we use the library <a href="https://kafka-python.readthedocs.io/en/master/">kafka-python</a>
+                        to consume messages. The third-party library kafka-python is easier to use than the library
+                        <a href="https://github.com/confluentinc/confluent-kafka-python">confluent-kafka-python</a> from
+                        the developers of Kafka, but also has somewhat fewer features.
+                    </div>
+
+                    <div class="block">
+                        Create a new notebook to play with the following code.
+                    </div>
+
+                    <div class="block">
+                        The following code imports the kafka consumer and instantiates the consumer with a consumer
+                        group ID. This automatically commits the consumer offset of a message when reading, and
+                        messages are not read multiple times.
+                    </div>
+
+                    <div class="block">
+                        If automatic commit is not desired, also pass the commented out arguments.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>from kafka import KafkaConsumer
+    
+consumer = KafkaConsumer(
+    bootstrap_servers=["event-streaming:9092"],
+    group_id="sandbox-group",
+    # auto_offset_reset="earliest",
+    # enable_auto_commit=False,
+)</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        Subscribe to our topic
+                    </div>
+
+                    <div class="block">
+                        <pre><code>consumer.subscribe("dev_sandbox")</code></pre>
+                    </div>
+
+                    <div class="block">
+                        And the following code reads continuously and outputs each read message with some metadata.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code># this code starts an infinite loop and consumes all messages that arrive for the given topic
+try:
+    for message in consumer:
+        topic_info = f"topic: {message.partition}|{message.offset}"
+        message_info = f"key: {message.key}, {message.value}"
+        print(f"{topic_info}, {message_info}")
+except Exception as e:
+    print(f"Error occurred while consuming messages: {e}")
+finally:
+    consumer.close()</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        Use <em>rpk</em> to send some messages and observe in the notebook how they are read.
+                    </div>
+
+                    <h3 class="title is-3"> Producing with kafka-python</h3>
+
+                    <div class="block">
+                        Next we write messages asynchronously. Stop the kernel in the notebook if the above cell
+                        is still running. Again we import, then instantiate
+                        a producer and set our topic.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>from kafka import KafkaProducer
+from kafka.errors import KafkaError
+
+producer = KafkaProducer(
+    bootstrap_servers = "event-streaming:9092"
+)
+
+topic = "dev_sandbox"</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        Now we define two callbacks.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>def on_success(metadata):
+    print(f"Message produced to topic '{metadata.topic}' at offset {metadata.offset}")
+
+def on_error(e):
+    print(f"Error sending message: {e}")</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        Finally we produce three messages asynchronously and flush and close the producer
+                        again.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>for i in range(1, 4):
+    msg = f"Message with id #{i}"
+    future = producer.send(topic, value=str.encode(msg))
+    future.add_callback(on_success)
+    future.add_errback(on_error)
+
+producer.flush()
+producer.close()</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        The messages are now in the queue. To display them, either check the Redpanda Console,
+                        or execute the consumer code from the beginning of the notebook again, or use
+                        <em>rpk</em>.
+                    </div>
+
+                    <h3 class="title is-3"> Generator for mushroom data</h3>
+
+                    <div class="block">
+                        Let's return to our mushroom dataset with which we trained a model and
+                        already wrote a batch inference pipeline. We now want to make realtime
+                        predictions instead of batch predictions within our newly set up event-driven architecture. For
+                        this we need a source that simulates our productive inference requests. The source should
+                        continuously generate mushroom data and write it to Redpanda as messages in the sense of a
+                        request for prediction.
+                    </div>
+
+                    <div class="block">
+                        The final product should be a Python script that can be called from the command line. The script
+                        should be called <em>mushroom_datagen.py</em> and be located in the <em>notebooks/</em>
+                        directory.
+                    </div>
+
+                    <div class="block">
+                        You can develop the script either within a Jupyter notebook, or directly as
+                        a script with VS Code, as you prefer.
+                    </div>
+
+                    <div class="block">
+                        If you want to execute the script from outside the container environment, you can do this with
+                        the following command:
+                    </div>
+
+                    <div class="block">
+                        <pre><code>docker compose run --rm --name=datagen --entrypoint=python3 development_env mushroom_datagen.py</code></pre>
+                    </div>
+
+                    <div class="block">
+                        Now to the script to be developed. You get the framework provided and then develop individual
+                        functions.
+                    </div>
+
+                    <div class="block">
+                        Use the following imports. You can of course also add more imports if your
+                        code needs them.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>import argparse
+import sys
+import time
+
+
+from loguru import logger
+import pandas as pd
+from kafka import KafkaProducer
+from kafka.errors import KafkaError    </code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        Now write the necessary functions to send to Kafka:
+                    </div>
+
+                    <div class="block">
+                        <ol>
+                            <li>initialize the Kafka Producer (without serializer)</li>
+                            <li>write the success and error callbacks. The callbacks should only log a corresponding
+                                debug or error message and have no other task.</li>
+                            <li>write the function that sends a message to Kafka</li>
+                        </ol>
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>producer = KafkaProducer(
+    # your code here
+)
+
+
+def on_success(metadata):
+    logger.debug()  # your code inside the parenthesis
+
+
+def on_error(e):
+    logger.error()  # your code inside the parenthesis
+
+
+def push_to_kafka(event, topic):
+    # your code here
+    # send an utf-8 encoded message with key=b'key'
+    # add callbacks
+    # flush</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code># everything quite similar to the examples above (except for the utf-8 encoding)
+
+producer = KafkaProducer(
+    bootstrap_servers = "event-streaming:9092",
+)
+
+
+def on_success(metadata):
+    logger.debug(f"Message produced to topic '{metadata.topic}' at offset {metadata.offset}")
+
+
+def on_error(e):
+    logger.error(f"Error sending message: {e}")
+
+
+def push_to_kafka(event, topic):
+    future = producer.send(topic=topic, key=b'key', value=event.encode('utf-8')) 
+    future.add_callback(on_success)
+    future.add_errback(on_error)
+    producer.flush()</code>
+</pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Next, write a function that returns a single
+                        inference request as json each time it is called, in the following form:
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>{
+    "cap-diameter":1382.0,
+    "cap-shape":5.0,
+    "gill-attachment":3.0,
+    "gill-color":4.0,
+    "stem-height":0.7349878012,
+    "stem-width":1583.0,
+    "stem-color":11.0,
+    "season":1.4574740759
+}</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        The value ranges should roughly correspond to those from the training data file, so they must
+                        not be completely random. In particular, no categorical values should be produced
+                        that are outside the interval <em>[min(col), max(col)]</em> of each column, and
+                        no negative values.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>def generate_event(# whatever you need):
+
+    # your code here
+
+    return # somehing as json</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Here is a possible implementation using two functions.
+
+                                First, the training data is loaded from the object store. Then a kernel
+                                density estimator is fitted to the numerical columns to have a simple way to
+                                generate random but similar values.
+
+                                To generate the output, we sample the numerical columns. The categorical
+                                ones we draw randomly.
+
+                                <pre><code>from random import randrange
+from sklearn.neighbors import KernelDensity
+
+
+def setup_data():
+    # fetch Training Dataset so we have a reference
+    df = pd.read_parquet('s3://traindata/train_raw.parquet',
+                            storage_options={"anon": False}).drop("class", axis="columns")
+
+    # setup column names
+    categoricals = ['cap-shape', 'gill-attachment', 'gill-color', 'stem-color']
+    numericals = [c for c in df.columns if c not in categoricals]
+
+    # fit an estimator to the numerical columns
+    kde = KernelDensity()
+    kde.fit(df[numericals])
+
+    return kde, numericals, categoricals, df
+
+
+def generate_event(kde, numericals, categoricals, df):
+    # take one row so we have something to fill in our generated values
+    new_row = pd.DataFrame(data=df.head(1))
+
+    # generate one row
+    new_row[numericals] = kde.sample(1)
+    for col in numericals:
+        # we are being lazy, when the kde yields a negative, just replace with mean
+        if new_row[col][0] < 0:
+            new_row[col] = df[col].mean()
+    for col in categoricals:
+        # for the categoricals, use a bounded random value
+        new_row[col] = randrange(df[col].min(), df[col].max()+1)
+    for col in new_row.columns:
+        # make sure the datatypes match the reference
+        new_row[col] = new_row[col].astype(df[col].dtype)
+
+    return new_row.iloc[0].to_json()</code>
+</pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Finally you must package everything into a command line script. The following snippet
+                        defines the necessary arguments and calls the main function <em>run()</em> (which you
+                        will write next):
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Simulates inference requests by sending mushroom dataset features to kafka."
+    )
+    parser.add_argument(
+        "-t",
+        "--topic",
+        type=str,
+        help="Kafka topic to send to",
+        default="mushroom_inference_request",
+    )
+    parser.add_argument(
+        "-s",
+        "--sleep_interval",
+        type=int,
+        help="Number of milliseconds to sleep between bursts",
+        default=1000,
+    )
+    parser.add_argument(
+        "-b",
+        "--burst_size",
+        type=int,
+        help="Number of messages to send together",
+        default=1,
+    )
+    parser.add_argument(
+        "-r",
+        "--randomness",
+        type=int,
+        help="Maximum number of seconds to wait between bursts",
+        default=1,
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action='store_true',
+        help="Log content of each message sent to stderr",
+    )
+    args = parser.parse_args()
+
+
+    if not args.verbose:
+        # increase loglevel from the default DEBUG to INFO to avoid logging every message
+        logger.remove(0)
+        logger.add(sys.stderr, level="INFO")
+
+    logger.info("Start sending messages to kafka.")
+    run(
+        topic = args.topic,
+        sleep_interval = args.sleep_interval,
+        burst_size = args.burst_size,
+        randomness = args.randomness
+    )</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        The <em>run()</em> function should send bursts of messages to Kafka in an endless loop, and
+                        sleep for the defined time after each burst.
+                    </div>
+
+                    <div class="block">
+                        <pre>
+    <code>def run(topic, sleep_interval, burst_size, randomness):
+    # maybe you need code here
+    while True:
+        # your code here</code>
+</pre>
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                A solution approach:
+                                <pre><code>def run(topic, sleep_interval, burst_size, randomness):
+    kde, numericals, categoricals, df = setup_data()
+    while True:
+        for _ in range(burst_size):
+            push_to_kafka(event=generate_event(kde, numericals, categoricals, df), topic=topic)
+
+        try:
+            sleep_milliseconds = sleep_interval + randrange(0, randomness*1000)
+        except ValueError:
+            # if randomness*1000 < 1
+            sleep_milliseconds = sleep_interval
+        time.sleep(sleep_milliseconds / 1000)
+</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Done! Now we test the script. If you placed it as described above, start it
+                        using
+                        <pre><code>docker compose run --rm --name=datagen --entrypoint=python3 development_env mushroom_datagen.py -v</code></pre>
+                    </div>
+
+                    <div class="block">
+                        If everything works,
+                    </div>
+
+                    <div class="block">
+                        <ul>
+                            <li>you should now see in the console how messages are produced and sent,</li>
+                            <li>in the Redpanda console you can see under the topic <em>mushroom_inference_request</em>
+                                how the messages arrive,</li>
+                            <li>with your notebook with the consumer code from the beginning of this exercise you can
+                                read the
+                                messages</li>
+                        </ul>
+                    </div>
+
+                    <div class="block">
+                        If it doesn't work and you need help, you can use the code below, which combines everything from
+                        above in the correct order in one script, to be put into the file <em>mushroom_datagen.py</em>.
+                        The order of imports (first), function definitions (in the middle) and the
+                        script entry point
+                        (at the end) must be correct.
+                        You CANNOT execute the cell in the notebook, it must be in a separate script and be executed in
+                        the Docker
+                        container
+                        as specified above.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                A solution approach:
+                                <pre><code>import argparse
+import sys
+import time
+from random import randrange
+
+
+import pandas as pd
+from kafka import KafkaProducer
+from kafka.errors import KafkaError
+from loguru import logger
+from sklearn.neighbors import KernelDensity
+
+producer = KafkaProducer(
+    bootstrap_servers = "event-streaming:9092",
+)
+
+def on_success(metadata):
+    logger.debug(f"Message produced to topic '{metadata.topic}' at offset {metadata.offset}")
+
+
+def on_error(e):
+    logger.error(f"Error sending message: {e}")
+
+
+def setup_data():
+    # fetch Training Dataset so we have a reference
+    df = pd.read_parquet('s3://traindata/train_raw.parquet',
+                            storage_options={"anon": False}).drop("class", axis="columns")
+
+    # setup column names
+    categoricals = ['cap-shape', 'gill-attachment', 'gill-color', 'stem-color']
+    numericals = [c for c in df.columns if c not in categoricals]
+
+    # fit an estimator the the numerical columns
+    kde = KernelDensity()
+    kde.fit(df[numericals])
+
+    return kde, numericals, categoricals, df
+
+
+def generate_event(kde, numericals, categoricals, df):
+    # take one row so we have something to fill in our generated values
+    new_row = pd.DataFrame(data=df.head(1))
+
+    # generate one row
+    new_row[numericals] = kde.sample(1)
+    for col in numericals:
+        # we are being lazy, when the kde yields a negative, just replace with mean
+        if new_row[col][0] < 0:
+            new_row[col] = df[col].mean()
+    for col in categoricals:
+        # for the categoricals, use a bounded random value
+        new_row[col] = randrange(df[col].min(), df[col].max()+1)
+    for col in new_row.columns:
+        # make sure the datatypes match the reference
+        new_row[col] = new_row[col].astype(df[col].dtype)
+
+    return new_row.iloc[0].to_json()
+
+
+def push_to_kafka(event, topic):
+    # send to redpanda
+    future = producer.send(topic=topic, key=b'key', value=event.encode('utf-8'))  # we skip message serializer and schema checks here
+    future.add_callback(on_success)
+    future.add_errback(on_error)
+    producer.flush()
+
+
+def run(topic, sleep_interval, burst_size, randomness):
+    kde, numericals, categoricals, df = setup_data()
+    while True:
+        for _ in range(burst_size):
+            push_to_kafka(event=generate_event(kde, numericals, categoricals, df), topic=topic)
+
+        try:
+            sleep_milliseconds = sleep_interval + randrange(0, randomness*1000)
+        except ValueError:
+            # if randomness*1000 < 1
+            sleep_milliseconds = sleep_interval
+        time.sleep(sleep_milliseconds / 1000)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Simulates inference requests by sending mushroom dataset features to kafka."
+    )
+    parser.add_argument(
+        "-t",
+        "--topic",
+        type=str,
+        help="Kafka topic to send to",
+        default="mushroom_inference_request",
+    )
+    parser.add_argument(
+        "-s",
+        "--sleep_interval",
+        type=int,
+        help="Number of milliseconds to sleep between bursts",
+        default=1000,
+    )
+    parser.add_argument(
+        "-b",
+        "--burst_size",
+        type=int,
+        help="Number of messages to send together",
+        default=1,
+    )
+    parser.add_argument(
+        "-r",
+        "--randomness",
+        type=int,
+        help="Maximum number of seconds to wait between bursts",
+        default=1,
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action='store_true',
+        help="Log content of each message sent to stderr",
+    )
+    args = parser.parse_args()
+
+    if not args.verbose:
+        # increase loglevel from the default DEBUG to INFO to avoid logging every message
+        logger.remove(0)
+        logger.add(sys.stderr, level="INFO")
+
+    logger.info("Start sending messages to kafka.")
+    run(
+        topic = args.topic,
+        sleep_interval = args.sleep_interval,
+        burst_size = args.burst_size,
+        randomness = args.randomness,
+    )
+</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        <strong>Now stop the generator again.</strong>
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <!-- and it's easy to individually load additional languages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/go.min.js"></script>
+    <script src="js/copy-button.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>12_Batch_Inference_Pipeline</title>
+
+    <link rel="stylesheet" href="css/bulma.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/default.min.css">
+    <script src="css/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>
+        // prevent annoying text selection when clicking to open solutions, but allow normal mouse selection
+        document.addEventListener('mousedown', function (event) {
+            if (event.detail > 1) {
+                event.preventDefault();
+            }
+        }, false);
+    </script>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-10 content-column">
+
+
+                    <h1 class="title is-1">Batch Inference</h1>
+
+                    <div class="block">
+                        Our model is fully trained and stored in the registry. Now we want to use it to
+                        make predictions using a batch pipeline. Fresh (raw) data for which we need a
+                        prediction is written to the object store either in batches or continuously by a
+                        surrounding system or an external process. Our pipeline is activated periodically, for example
+                        once per night, fetches the data from the past period, makes predictions for this
+                        data, and writes the result back to the object store.
+                    </div>
+
+                    <h1 class="title is-1">Preparation</h1>
+
+                    <div class="block">
+                        Create a new Jupyter notebook for this exercise.
+                    </div>
+
+                    <h1 class="title is-1">Exercises</h1>
+
+                    <h3 class="title is-3"> Architecture</h3>
+
+                    <div class="block">
+                        We are adding the first pipeline to our architecture. The pipeline retrieves the model from
+                        MLFlow.
+                        It reads the data for inference, for example once every night, from the object store.
+                        It also writes the predictions back there.
+                    </div>
+
+                    <img src="img/batch_pipeline_01.png" width="50%">
+
+                    <h3 class="title is-3"> Simulate inference data</h3>
+
+                    <div class="block">
+                        First, we need code to create a bucket with data for which we want to perform inference.
+                    </div>
+
+                    <div class="block">
+                        We keep it simple here and don't create fresh data, but instead use the
+                        training data. In the stream processing exercise, we will then simulate fresh data in a better
+                        way.
+                    </div>
+
+                    <div class="block">
+                        Load the training data, remove the label, and add a column
+                        named <em>event_date</em> as the first column in the DataFrame. The event date should be of type
+                        <em>datetime64[ns]</em>
+                        and approximately a quarter of the rows should have one of the following four values:
+                        <em>2026-02-20</em>,
+                        <em>2026-02-21</em>, <em>2026-02-22</em>, <em>2026-02-23</em>.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>import pandas as pd
+import numpy as np
+
+# you can ignore the FutureWarning
+
+df = pd.read_parquet('s3://traindata/train_raw.parquet', storage_options={"anon": False}).drop('class', axis='columns')
+
+# quick and dirty way to add an event date column
+df.insert(0, 'event_date', -1)
+num_days = 4
+for chunk, date_ in zip(np.array_split(df, num_days), pd.date_range("2026-02-20", periods=num_days, freq="d")):
+    chunk.event_date = date_
+    df = pd.concat([df, chunk], axis='rows')
+    
+# we need to remove all original rows, those are now duplicates since we simply concatenated
+df = df[df.event_date != -1]
+
+df.head()
+</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        We create a new bucket
+                    </div>
+
+                    <div class="block">
+                        <pre><code>import s3fs
+
+s3 = s3fs.S3FileSystem()
+s3.mkdir("inferencedata")</code></pre>
+                    </div>
+
+                    <div class="block">
+                        And store the data.
+                    </div>
+
+                    <div class="block">
+                        <pre><code>df.to_parquet('s3://inferencedata/inference_raw.parquet', storage_options={"anon": False})</code></pre>
+                    </div>
+
+                    <h3 class="title is-3"> Load model</h3>
+
+                    <div class="block">
+                        Now the pipeline code begins.
+                    </div>
+
+                    <div class="block">
+                        First, load your model from MLFlow. You can reference the model in various ways.
+                        Ideally, you do this via model name and a version alias.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>import mlflow
+
+# we never defined an official name, make sure you use the name of your own registered model here
+model_name = "mushroom"
+
+# this only works if you set this alias for above model
+model_version_alias = "champion"
+
+model_uri = f"models:/{model_name}@{model_version_alias}"
+model = mlflow.sklearn.load_model(model_uri)
+</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Load data</h3>
+
+                    <div class="block">
+                        Next, load the data just generated. However, only load the data from
+                        <em>yesterday</em>, not all data. This doesn't mean loading all data and
+                        then filtering, but rather filter by date already during loading to remain memory-efficient and
+                        generate less network traffic.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>yesterday = pd.Timestamp.today() - pd.Timedelta(days=1)
+yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+
+# only for debugging purposes
+# yesterday = pd.to_datetime('2026-02-22') - pd.Timedelta(days=1)
+
+sel = [("event_date", "==", yesterday)]
+df = pd.read_parquet('s3://inferencedata/inference_raw.parquet', filters=sel, storage_options={"anon": False})
+df.head()
+</code></pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Perform inference</h3>
+
+                    <div class="block">
+                        Now perform inference on the loaded data. Append a column named
+                        <em>prediction</em> at the end of the DataFrame <em>df</em>.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>df['prediction'] = model.predict(df.drop('event_date', axis='columns'))</pre>
+                                </code>
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Write result back to the object store</h3>
+
+                    <div class="block">
+                        Now you can write the result back. We are taking the easy route and skip creating a new
+                        bucket.
+                    </div>
+
+                    <div class="block">
+                        <pre><code>df.to_parquet('s3://inferencedata/inference_prediction.parquet', storage_options={"anon": False})</code></pre>
+                    </div>
+
+                    <h3 class="title is-3"> Wrapup</h3>
+
+                    <div class="block">
+                        In this exercise, you built a simple batch processing pipeline with Python/Pandas that
+                        performs inference for our mushroom model and writes the result back to the object store.
+                    </div>
+
+                    <div class="block">
+                        In doing so, we also took a few shortcuts, which is acceptable in the context of a course,
+                        but we should also be aware of them:
+                    </div>
+
+                    <div class="block">
+                        <ul>
+                            <li>Batch processing is normally done with Spark / PySpark and not with Pandas.
+                                However, the difference is not relevant here.</li>
+                            <li>We work with simple timestamps. No handling of time zones, no conversion
+                                to UTC. Normalization of timestamps to UTC is an important step in
+                                data pipelines.</li>
+                            <li>We don't log anything, especially no operational metrics like memory consumption</li>
+                            <li>No tests, no proper error handling</li>
+                            <li>Our pipeline lives in a Jupyter notebook. To properly operationalize it,
+                                it should be called in the form of a script by an orchestration tool like Apache
+                                Airflow</li>
+                        </ul>
+                    </div>
+
+                    <div class="block">
+                        And in particular:
+                    </div>
+
+                    <div class="block">
+                        We work with the raw data and don't do any feature engineering. Even though we could easily
+                        calculate features in our batch pipeline, this becomes unwieldy as the number of features
+                        and models increases.
+                    </div>
+
+                    <div class="block">
+                        The solution is to use a feature store, more on this later.
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <!-- and it's easy to individually load additional languages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/go.min.js"></script>
+    <script src="js/copy-button.js"></script>
+</body>
+
+</html>

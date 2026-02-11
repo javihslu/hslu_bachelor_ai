@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>18_Monitoring_Infrastruktur</title>
+
+    <link rel="stylesheet" href="css/bulma.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/default.min.css">
+    <script src="css/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>
+        // prevent annoying text selection when clicking to open solutions, but allow normal mouse selection
+        document.addEventListener('mousedown', function (event) {
+            if (event.detail > 1) {
+                event.preventDefault();
+            }
+        }, false);
+    </script>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-10 content-column">
+
+
+                    <h1 class="title is-1">Drift Detection Infrastructure</h1>
+
+                    <div class="block">
+                        In this exercise we will set up and get to know the monitoring service. We will use
+                        <a href="https://prometheus.io/docs/introduction/overview/">Prometheus</a> with the <a
+                            href="https://github.com/prometheus/statsd_exporter">Statsd Exporter</a> and <a
+                            href="https://grafana.com/">Grafana</a>.
+                    </div>
+
+                    <div class="block">
+                        These tools are already being used by many organizations for collecting metrics, displaying
+                        their progression and for alerting.
+                    </div>
+
+                    <h1 class="title is-1">Preparation</h1>
+
+                    <div class="block">
+                        Save all your open notebooks. Stop all containers by navigating to the top-level
+                        directory of the exercises (where the file <em>docker-compose.yml</em> is located) and
+                        executing <em>docker compose down</em>. If you have the containers running in the foreground,
+                        you can
+                        stop the processes in that terminal with <em>ctrl-c</em>.
+                    </div>
+
+                    <div class="block">
+                        Uncomment the monitoring service in the top-level compose file <em>docker-compose.yml</em>.
+                    </div>
+
+                    <div class="block">
+                        Start all containers again.
+                    </div>
+
+                    <h1 class="title is-1">Exercises</h1>
+
+                    <h3 class="title is-3"> Architecture</h3>
+
+                    <div class="block">
+                        We will set up the following architecture:
+                    </div>
+
+                    <img src="img/monitoring_01.png" width="70%">
+
+                    <div class="block">
+                        It is important to understand the purpose of the individual components.
+                    </div>
+
+                    <div class="block">
+                        <ul>
+                            <li><strong>Prometheus</strong>: Collects and stores data points and offers its own language
+                                with PromQL to analyze them. Prometheus always actively pulls metrics, which
+                                is great for services that can then simply offer their metrics on a web page in the
+                                format
+                                specified by Prometheus.</li>
+                            <li><strong>Grafana</strong>: Fetches data from various sources and displays them
+                                graphically.
+                                Can send alerts.</li>
+                            <li><strong>Our batch and streaming pipelines</strong>: Calculate and actively push metrics.
+                            </li>
+                            <li><strong>Statsd Exporter</strong>: Receives metrics from the pipelines in Statsd format
+                                and provides a corresponding endpoint for Prometheus to pull from.</li>
+                        </ul>
+                    </div>
+
+                    <div class="block">
+                        The Statsd format is a common format for logging metrics. The Statsd_Exporter translates
+                        from this format into a format that Prometheus can understand.
+                    </div>
+
+                    <div class="block">
+                        Why is the functionality of the Statsd_Exporter even necessary here?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                If we only had streaming pipelines, the functionality of the Statsd_Exporter would not
+                                technically be necessary. The pipelines could themselves provide a corresponding
+                                endpoint for Prometheus polling, since they run constantly (although whether that would
+                                be good software design is debatable).
+
+                                For batch pipelines, which are started periodically, run through and then
+                                terminate, the functionality of the Statsd_Exporter is absolutely necessary.
+                            </article>
+                        </details>
+                    </div>
+
+                    <h3 class="title is-3"> Statsd Service</h3>
+
+                    <div class="block">
+                        Look at the compose file of the monitoring services. Via which port can you access Statsd from
+                        outside
+                        Docker?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                From outside Docker you can access via port 9102.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now look at the mapping file. What four pieces of information do we provide when our pipeline
+                        logs a drift metric?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                You can find the information in the file
+                                <em>prometheus_config/statsd_metrics-mapping.yml</em>. We provide the name of the
+                                dataset
+                                for which we calculate the drift (dataset_name), its
+                                version (dataset_version), the column name in question (column_name) as well as the
+                                designation of the metric we calculate (metric_name).
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now access the metrics page that the Statsd_Exporter provides for Prometheus.
+                        To do this, open the Statsd service web page (port 9102) in Codespaces and
+                        append the URL <em>/metrics</em>. You already see a lot of text without having
+                        logged anything yet. What could this mean?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                These are metrics that the Statsd_Exporter makes available about itself,
+                                so that it can be monitored as a service.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        The exporter reads every received string, and if it matches one of the defined mappings,
+                        the (updated) value appears on the <em>/metrics</em> web page and can be
+                        polled by Prometheus.
+                    </div>
+
+                    <div class="block">
+                        What must a valid string look like that defines one of our drift metrics?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                The <em>match</em> directive from the mappings file shows the pattern with four
+                                placeholders:
+
+                                <pre><code>match: "drift_metrics.*.*.*.*"</code></pre>
+
+                                We can insert arbitrary values for the <em>*</em>, e.g.
+
+                                <pre><code>drift_metrics.mushroom.v1.cap-diameter.wasserstein</code></pre>
+
+                                The actual value is appended, separated by a colon. After that follows,
+                                separated by a pipe, the type of the metric. We will see later which types exist.
+
+                                <pre><code>drift_metrics.mushroom.v1.cap-diameter.wasserstein:42|g</code></pre>
+
+                                The four <em>labels</em> are used for reformatting into the Prometheus format.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now try as a test to send the value of a metric to the Statsd_Exporter. To do this, you must
+                        send the above string via UDP to port 8125. The easiest way is via <a
+                            href="https://en.wikipedia.org/wiki/Netcat">netcat</a>. However, since the port is not
+                        mapped outside the Docker network (only <em>expose</em> and not <em>ports</em> in the
+                        compose file), and netcat may not be installed on the host (the started codespace),
+                        you use a Docker image. Execute the following command:
+                    </div>
+
+                    <div class="block">
+                        <pre><code>docker run -i --rm --network=production --name netcat_test subfuzion/netcat -u statsd 8125</code></pre>
+                    </div>
+
+                    <div class="block">
+                        Netcat waits for input (no prompt visible), you paste the following string from above
+                        and press Enter.
+                    </div>
+
+                    <div class="block">
+                        <pre><code>drift_metrics.mushroom.v1.cap-diameter.wasserstein:42|g</code></pre>
+                    </div>
+
+                    <div class="block">
+                        Now go to the StatsD web page again. The metric should now be visible with the value 42
+                        (probably at the top of the page):
+                    </div>
+
+                    <div class="block">
+                        <pre><code>drift_metrics{column_name="cap-diameter",dataset_name="mushroom",dataset_version="v1",metric_name="wasserstein"} 42</code></pre>
+                    </div>
+
+                    <div class="block">
+                        We see that the exporter has used the information from the mappings file to reformat the
+                        received
+                        metric for Prometheus.
+                    </div>
+
+                    <div class="block">
+                        You can stop the still running netcat container using <em>docker stop netcat_test</em>
+                        (for this you need to open a new terminal in Codespaces).
+                    </div>
+
+                    <h3 class="title is-3"> Prometheus Service</h3>
+
+                    <div class="block">
+                        Now look at the config file of Prometheus. What do you see?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Two jobs are defined, so Prometheus collects data from two services.
+                                On the one hand from itself, and on the other hand our drift metrics via Statsd.
+                                Actually, more sources should be defined, namely those of our remaining
+                                services (Jupyter, MinIO, MLFlow, Redpanda, StatsD and the
+                                Grafana that follows below), because we want to monitor every service in a productive
+                                system.
+                                However, we have omitted these for simplicity.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now open the web page of the Prometheus service (port 9090). Try to display the previously
+                        logged drift metric as a test as well as metrics about Prometheus itself.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                You can for example enter <em>drift_metrics</em> in the query window and
+                                press <em>Execute</em>. Auto-complete also works.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now also display the configured targets via the status menu. You see the targets defined in the
+                        config file,
+                        <em>prometheus</em> and <em>dataset_metrics</em>.
+                    </div>
+
+                    <h3 class="title is-3"> Grafana</h3>
+
+                    <div class="block">
+                        Now access the Grafana service (port 3000). First, create a data source for
+                        Prometheus.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <ol>
+                                    <li>Click in the sidebar on the left on <em>Connections -> Data sources</em> and
+                                        then on
+                                        <em>Add new data source</em> at the top right.
+                                    </li>
+                                    <li>Search for and select <em>Prometheus</em></li>
+                                    <li>Set the <em>Prometheus server URL</em> under Connections to
+                                        <em>http://prometheus:9090</em>
+                                    </li>
+                                    <li>Click on <em>Save & test</em> at the very bottom, a green success
+                                        message should appear</li>
+                                </ol>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Next, create a new dashboard and add a visualization to it. Build
+                        a visualization that displays the drift metric in a simple way. You won't
+                        be able to see much yet, because you only have a single data point, the one from the above test.
+                        You
+                        can then expand the dashboard later when we have more data.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <ol>
+                                    <li><em>Dashboards -> New</em></li>
+                                    <li><em>Add visualization</em></li>
+                                    <li>Select Prometheus</li>
+                                    <li>Under <em>Metric</em> in the <em>Select metric</em> dropdown select
+                                        <em>drift_metrics</em>
+                                    </li>
+                                    <li>Press the <em>Run queries</em> button</li>
+                                </ol>
+                                You now see a small dot or line in the panel and a long
+                                line in the legend (possibly click on Refresh at the top right). This
+                                automatically generated label is somewhat illegible. Under <em>Options</em> we can
+                                adjust this: Legend = Custom, instead of <em>{{label_name}}</em> we set
+                                <em>{{column_name}}</em>.
+
+                                Now set a <em>Panel Title</em> at the top right and click Save and name the dashboard.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        If you like, you can now also add Grafana itself as a source in Prometheus, so that
+                        we can also monitor the Grafana service :-)
+                    </div>
+
+                    <h1 class="title is-1">Architecture Overview</h1>
+
+                    <div class="block">
+                        Our extended architecture (without pipelines) now looks like this.
+                    </div>
+
+                    <img src="img/monitoring_02.png" width="60%">
+
+                    <div class="block">
+                        You can now continue with the next exercise (<a
+                            href="19_Drift_Detection_Pipeline.html">19_Drift_Detection_Pipeline</a>).
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <!-- and it's easy to individually load additional languages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/go.min.js"></script>
+    <script src="js/copy-button.js"></script>
+</body>
+
+</html>

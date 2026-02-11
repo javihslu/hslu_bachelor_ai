@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>09_Model_Registry_Service</title>
+
+    <link rel="stylesheet" href="css/bulma.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/default.min.css">
+    <script src="css/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <script>
+        // prevent annoying text selection when clicking to open solutions, but allow normal mouse selection
+        document.addEventListener('mousedown', function (event) {
+            if (event.detail > 1) {
+                event.preventDefault();
+            }
+        }, false);
+    </script>
+</head>
+
+<body>
+    <section class="section">
+        <div class="container">
+            <div class="columns is-centered">
+                <div class="column is-10 content-column">
+
+
+                    <h1 class="title is-1">MLFlow Service</h1>
+
+                    <div class="block">
+                        In this exercise, we will set up the MLFlow service.
+                    </div>
+
+                    <h1 class="title is-1">Preparation</h1>
+
+                    <div class="block">
+                        There is nothing to prepare this time.
+                    </div>
+
+                    <h1 class="title is-1">Exercises</h1>
+
+                    <div class="block">
+                        We are extending our infrastructure with MLFlow, which provides experiment tracking, a
+                        deployment
+                        API, and a model registry.
+                    </div>
+
+                    <div class="block">
+                        In the first exercise, we defined the two Docker networks <em>development</em> and
+                        <em>production</em>. In which of these networks do we integrate MLFlow?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                Correct, in both of course. MLFlow must be available during development for logging
+                                models, and during operation for retrieving ML models from the registry.
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Take a look at the MLFlow compose file, which you will find under
+                        <em>exercises/containers/mlflow/</em>
+                    </div>
+
+                    <div class="block">
+                        <ul>
+                            <li>Via which port can you access MLFlow?</li>
+                            <li>Where are the artifacts stored?</li>
+                            <li>Where are the metadata stored?</li>
+                        </ul>
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                You can find the answer in the command, ports, and volume directives in the compose
+                                file:
+                                <pre>
+        <code>command: mlflow server --host 0.0.0.0 --port 5001 --artifacts-destination s3://artifacts --backend-store-uri sqlite:///metadata/metadata.sqlite
+
+ports:
+  - 5001:5001  # 5000 (mlflow default port) is taken by airplay on macos
+
+volumes:
+  - ../../mlflow_metadata:/metadata</code>
+    </pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        Now activate and start the MLFlow service.
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                To do this, follow these five steps:
+
+                                <ol>
+                                    <li>Save all running notebooks</li>
+                                    <li>Stop all containers: either with ctrl-c if the Docker process is running in
+                                        the foreground, or with <em>docker compose down</em> in the directory
+                                        <em>exercises/</em>, where the top-level file <em>docker-compose.yml</em> is
+                                        located.
+                                    </li>
+                                    <li>Uncomment the line with MLFlow in the top-level compose file:</li>
+                                </ol>
+
+                                <pre>
+    <code>include:
+    - docker_includes/networks.yml
+    - containers/objectstore/docker-compose.yml
+    - containers/development_env/docker-compose.yml
+    - containers/mlflow/docker-compose.yml
+#  - containers/event-streaming/docker-compose.yml
+#  - containers/monitoring/docker-compose.yml</code>
+</pre>
+
+                                <ol start="4">
+                                    <li>In the compose file of the development environment
+                                        (<em>containers/development_env/docker-compose.yml</em>), uncomment the
+                                        environment variable
+                                        <em>MLFLOW_TRACKING_URI</em>:
+                                    </li>
+                                    <pre>
+        <code>environment:
+    - FSSPEC_S3_KEY=${MINIO_ADMIN}
+    - FSSPEC_S3_SECRET=${MINIO_SECRET}
+    - FSSPEC_S3_ENDPOINT_URL=${MINIO_ENDPOINT}
+    - GIT_PYTHON_REFRESH=quiet
+    - MLFLOW_TRACKING_URI=http://model-registry:5001</code>
+    </pre>
+                                    <li>Start the containers again with <em>docker-compose up</em> or <em>docker-compose
+                                            up -d</em>
+                                        (the first time, this will take a moment until the image is loaded)</li>
+                                </ol>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        In codespaces, a message should appear that a new port has been opened. You can open the
+                        just-started MLFlow service (model-registry) once to check. You will work with it
+                        in the next exercise.
+                    </div>
+
+                    <div class="block">
+                        Our environment now looks like this:
+                    </div>
+
+                    <img src="img/summary_mlflow.png" , width=60%>
+
+                    <div class="block">
+                        Take another look at the MLFlow compose file. There is still something to do - can you
+                        figure out what?
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                MLFlow is started in the <em>docker-compose.yml</em> file with the following command:
+
+                                <div class="block">
+                                    command: mlflow server --host 0.0.0.0 --port 5001 <em>--artifacts-destination
+                                        s3://artifacts</em> --backend-store-uri sqlite:///metadata/metadata.sqlite
+                                </div>
+
+                                <div class="block">
+                                    This bucket in the object store must be created manually. Everything below it
+                                    is then created and managed by MLFlow itself.
+                                </div>
+                                <div class="block">
+                                    Create the bucket.
+                                </div>
+                            </article>
+                        </details>
+                    </div>
+
+                    <div class="block">
+                        <details>
+                            <summary>Suggested solution</summary>
+                            <article>
+                                <pre><code>import s3fs
+
+s3fs.S3FileSystem().mkdir('/artifacts')</code>
+</pre>
+                            </article>
+                        </details>
+                    </div>
+
+                    You can now proceed directly to the next exercise <a
+                        href="10_A_simple_model_with_mlflow.html">10_A_simple_model_with_mlflow.html</a>.
+
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <!-- and it's easy to individually load additional languages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/go.min.js"></script>
+    <script src="js/copy-button.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,70 @@
+services:
+  event-streaming:
+    container_name: event-streaming
+    image: docker.redpanda.com/redpandadata/redpanda:v25.3.2
+    command:
+      - redpanda
+      - start
+      # Address the broker advertises to clients that connect to the Kafka API.
+      # Use the internal addresses to connect to the Redpanda brokers'
+      # from inside the same Docker network.
+      # Use the external addresses to connect to the Redpanda brokers'
+      # from outside the Docker network.
+      #- --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --kafka-addr internal://0.0.0.0:9092
+      #- --advertise-kafka-addr internal://event-streaming:9092,external://localhost:19092
+      - --advertise-kafka-addr internal://event-streaming:9092
+
+      # Address the broker advertises to clients that connect to the HTTP Proxy.
+      #- --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --pandaproxy-addr internal://0.0.0.0:8082
+      #- --advertise-pandaproxy-addr internal://event-streaming:8082,external://localhost:1808
+      - --advertise-pandaproxy-addr internal://event-streaming:8082
+      # - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --schema-registry-addr internal://0.0.0.0:8081
+      # Redpanda brokers use the RPC API to communicate with each other internally.
+      - --rpc-addr event-streaming:33145
+      - --advertise-rpc-addr event-streaming:33145
+      # Mode dev-container uses well-known configuration properties for development in containers.
+      - --mode dev-container
+      # Tells Seastar (the framework Redpanda uses under the hood) to use 1 core on the system.
+      - --smp 1
+      - --default-log-level=warn
+    healthcheck:
+      test: curl --fail http://localhost:9644/v1/status/ready || exit 1
+      interval: 20s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    volumes:
+      - events:/var/lib/redpanda/data
+    networks:
+      - production
+      - development
+
+  console:
+    container_name: event-streaming-console
+    image: docker.redpanda.com/redpandadata/console:v3.3.2
+    depends_on:
+      event-streaming:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["event-streaming:9092"]
+        auditLog:
+          enabled: false
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://event-streaming:9644"]
+    ports:
+      - 127.0.0.1:8085:8080
+    networks:
+      - production
+
+volumes:
+  events:
