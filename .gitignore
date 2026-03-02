@@ -380,3 +380,4 @@ presentation_venv/*
 # Some temporary notes that need cleaning and sorting
 notes/*
 slides/othertemplate
+s3_data/
