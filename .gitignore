@@ -367,6 +367,9 @@ tags
 
 # End of https://www.toptal.com/developers/gitignore/api/vim,emacs,python,pycharm+all,jupyternotebooks,visualstudiocode,obsidian
 
+# S3 metadata files
+*.xl.meta
+
 # installed binaries
 pdfsizeopt/*
 
